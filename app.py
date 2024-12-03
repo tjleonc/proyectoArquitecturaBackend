@@ -3,8 +3,10 @@ from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from models import db, Departamento, Gasto
 from datetime import datetime
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 app.config.from_object(Config)
 db.init_app(app)
 
@@ -17,7 +19,7 @@ def generar_gastos():
     data = request.get_json()
     mes = data.get('mes')
     año = data.get('año')
-    monto = data.get('monto', 10000)
+    monto = data.get('monto', 110000)
 
     departamentos = Departamento.query.all()
     for depto in departamentos:
@@ -55,7 +57,7 @@ def marcar_pagado():
         gasto.pagado = True
         gasto.fecha_pago = datetime.strptime(fecha_pago, '%Y-%m-%d')
         db.session.commit()
-        if gasto.fecha_pago.month <= mes:
+        if str(gasto.fecha_pago.month) <= str(mes):
             estado_transaccion = "Pago exitoso dentro del plazo"
         else:
             estado_transaccion = "Pago exitoso fuera de plazo"
@@ -65,13 +67,18 @@ def marcar_pagado():
 
 @app.route('/listar_pendientes', methods=['GET'])
 def listar_pendientes():
-    mes = int(request.args.get('mes'))
-    año = int(request.args.get('año'))
+    mes = request.args.get('mes')
+    año = request.args.get('año')
+
+    if not mes or not año:
+        return jsonify({"error": "Los parámetros 'mes' y 'año' son obligatorios"}), 400
 
     pendientes = Gasto.query.filter(
         Gasto.pagado == False,
         (Gasto.año < año) | ((Gasto.año == año) & (Gasto.mes <= mes))
     ).order_by(Gasto.año, Gasto.mes).all()
+
+    print(pendientes)
 
     if not pendientes:
         return jsonify({"mensaje": "Sin montos pendientes"}), 200
@@ -87,4 +94,4 @@ def listar_pendientes():
     return jsonify(resultado), 200
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(port=5000)
